@@ -1,6 +1,8 @@
 # lst-eth-pool-yield
 
-Comparing MAV swETH/ETH Pool vs Curve stETH/ETH pool
-* library_pool_data.py use alchemy (need your own api) and coingecko  api to download. For easier usage, some data has been saved in csv in output folder that other py file can direct use.
+Comparing Curve stETH/ETH pool and MAV swETH/ETH Pool
+* main_lst_pool_eval.py to get metrics of pool (curve steth-eth, mav sweth-weth)
+* library_pool_data.py use alchemy (need your own api key)  and coingecko  api to download pool tx and token price data. data also pre-saved in csv in output folder for logic to run without downloading.
 * library_pool_logic.py compile/clean the data into dataframe and calculate metrics
-* main_doc.ipynb is for chart
+
+code not optimised, with a lot of print in between to cross check results. 
