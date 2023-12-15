@@ -3,6 +3,8 @@ import library_pool_data as lib_data
 import pandas as pd
 import numpy as np
 
+
+
 def get_mav_pool_daily_asset_hold_and_trade_vol(date_begin_str='20230909', date_end_str = '20231208'):
 
     # contract_addr = CONST.MAV_POOL_ETH_SWETH
@@ -81,8 +83,24 @@ def get_mav_pool_daily_TVL(date_begin_str='20230801', date_end_str = '20231211')
 
 
 def get_curve_pool_daily_asset_hold_and_trade_vol(date_begin_str='20230909', date_end_str = '20231208'):
-    df_to = pd.read_csv('output/token_txs_in_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv', index_col=0)
-    df_frm = pd.read_csv('output/token_txs_out_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv',index_col=0)
+    # df_to = pd.read_csv('output/token_txs_in_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv', index_col=0)
+    # df_frm = pd.read_csv('output/token_txs_out_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv',index_col=0)
+
+    df_to_erc20 = pd.read_csv('output/token_txs_in_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv', index_col=0)
+    df_frm_erc20 = pd.read_csv('output/token_txs_out_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv',index_col=0)
+
+    df_to_eth_leg = pd.read_csv('output/token_txs_external_internalin_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv', index_col=0)
+    df_frm_eth_leg = pd.read_csv('output/token_txs_external_internalout_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv',index_col=0)
+
+    def keep_only_exchange_tx(df_token, df_eth_opposite):
+        df_token_swap = df_token[df_token['hash'].isin(df_eth_opposite['hash'])]
+        return df_token_swap
+
+    df_to = keep_only_exchange_tx(df_to_erc20, df_frm_eth_leg)
+    df_frm = keep_only_exchange_tx(df_frm_erc20, df_to_eth_leg)
+
+
+
 
     file_price_steth = "output/price_STETH_vs_eth.csv"
     df_price = pd.read_csv(file_price_steth)
@@ -126,6 +144,74 @@ def get_curve_pool_daily_asset_hold_and_trade_vol(date_begin_str='20230909', dat
     df.sort_values(by='date', ascending=False, inplace=True)
     return df
 
+def get_bin_price_range_same_liquidity(price_change):
+    return -price_change/(1+price_change)
+
+# Get impermanent loss, qty_change_token0, and token1. 
+# code also works if input is array
+def get_impermanent_loss(price_change, is_change_token0=True, b_return_df = False, ret_imp_loss_only = False ):
+    #input value check ignored here
+    if(is_change_token0):
+        price_change_token0 = np.array(price_change)
+    else:
+        price_change_token0 = 1/(1+np.array(price_change))
+    new_price0_sqrt = np.sqrt(1+price_change_token0)
+    new_x = 1/new_price0_sqrt
+    new_y = new_price0_sqrt
+    new_pf_value = (1+price_change_token0)*new_x + new_y
+    buyhold_value = (1+price_change_token0) + 1
+    imp_loss = new_pf_value/buyhold_value -1
+    qty_chg_token0 = new_x -1
+    qty_chg_token1 = new_y -1
+
+    if ret_imp_loss_only :
+        return imp_loss
+
+
+    if np.isscalar(price_change):
+        result_matrix = np.array([ imp_loss, qty_chg_token0, qty_chg_token1])
+    else:
+        result_matrix = np.column_stack(( imp_loss, qty_chg_token0, qty_chg_token1))
+    
+    if (b_return_df):
+        # Column names
+        column_names = [ 'imp_loss', 'qty_chg_token0', 'qty_chg_token1']
+        
+        if result_matrix.ndim == 1:
+            result_matrix = result_matrix.reshape(1, -1)
+        
+        # Convert NumPy array to DataFrame with column names
+        result_matrix = pd.DataFrame(result_matrix, columns=column_names)    
+
+    return result_matrix
+
+def get_impermanent_loss_range_pos(price_change, price_range_down, is_change_token0=True, b_return_df = False):
+    #input value check ignored here
+    price_range_up = get_bin_price_range_same_liquidity(price_range_down)
+
+    #print(price_change,price_range_down, price_range_up )
+
+    x_0 = 1-1/np.sqrt(1+price_range_up)
+    y_0 = 1-np.sqrt(1+price_range_down)
+
+    x_n_raw = 1/np.sqrt(1+price_change)-1/np.sqrt(1+price_range_up)
+    y_n_raw = np.sqrt(1+price_change) - np.sqrt(1+price_range_down)
+
+    x_max = 1/np.sqrt(1+price_range_down)-1/np.sqrt(1+price_range_up)
+    y_max = np.sqrt(1+price_range_up) - np.sqrt(1+price_range_down)
+
+    # x_n cannot be less than 0, or higher when all y is swapped
+    x_n = np.minimum(x_max, np.maximum(x_n_raw, 0))
+    y_n = np.minimum(y_max, np.maximum(y_n_raw, 0))
+
+    portfolio_0 = x_0*(1+price_change) + y_0
+    portfolio_1 = x_n*(1+price_change) + y_n
+
+    imp_loss = portfolio_1/portfolio_0-1
+    return imp_loss
+
+
+
 
 
 if __name__ == '__main__':
@@ -134,27 +220,27 @@ if __name__ == '__main__':
     date_begin_str='20230909'
     date_end_str = '20231208'
     df_mav = get_mav_pool_daily_asset_hold_and_trade_vol(date_begin_str, date_end_str)
-    print(df_mav.head(5))
-    print(df_mav.tail(5))
+    print(df_mav.head(2))
+    print(df_mav.tail(2))
     standard_col_names = ['date', 'block_number', 'pool_name', 'staking_token', 'token_price_eth', 'tvl_eth',  'staking_asset_amt_eth', 'traded_amt_eth']
-    print('\n90d annualised fee yield', df_mav['daily_turnover_rate'].mean()*365*0.0002)
-    print('30d annualised fee yield', df_mav['daily_turnover_rate'].head(30).mean()*365*0.0002)
-    print('\n90d average staking rate', df_mav['daily_staking_rate'].mean())
-    print('30d average staking rate', df_mav['daily_staking_rate'].head(30).mean())
-    print('\n90d average staking rate', df_mav['daily_turnover_rate'].mean())
-    print('30d average staking rate', df_mav['daily_turnover_rate'].head(30).mean())
+    print('\n90d annualised trading fee only yield', df_mav['daily_turnover_rate'].mean()*365*0.0002)
+    print('30d annualised trading fee only yield', df_mav['daily_turnover_rate'].head(30).mean()*365*0.0002)
+    print('\n90d average staking %', df_mav['daily_staking_rate'].mean())
+    print('30d average staking %', df_mav['daily_staking_rate'].head(30).mean())
+    print('\n90d average daily turnover rate', df_mav['daily_turnover_rate'].mean())
+    print('30d average daily turnover rate', df_mav['daily_turnover_rate'].head(30).mean())
 
     print('\n-- Get CURVE STETH/ETH Pool Data ---')
     df_curve = get_curve_pool_daily_asset_hold_and_trade_vol(date_begin_str, date_end_str)
-    print(df_curve.head(5))
-    print(df_curve.tail(5))
+    print(df_curve.head(2))
+    print(df_curve.tail(2))
     standard_col_names = ['date', 'block_number', 'pool_name', 'staking_token', 'token_price_eth', 'tvl_eth',  'staking_asset_amt_eth', 'traded_amt_eth']
-    print('\n90d annualised fee yield', df_curve['daily_turnover_rate'].mean()*365*0.0001)
-    print('30d annualised fee yield', df_curve['daily_turnover_rate'].head(30).mean()*365*0.0001)
-    print('\n90d average staking rate', df_curve['daily_staking_rate'].mean())
-    print('30d average staking rate', df_curve['daily_staking_rate'].head(30).mean())
-    print('\n90d average staking rate', df_curve['daily_turnover_rate'].mean())
-    print('30d average staking rate', df_curve['daily_turnover_rate'].head(30).mean())
+    print('\n90d annualised trading fee only yield', df_curve['daily_turnover_rate'].mean()*365*0.0001)
+    print('30d annualised trading fee only yield', df_curve['daily_turnover_rate'].head(30).mean()*365*0.0001)
+    print('\n90d average staking %', df_curve['daily_staking_rate'].mean())
+    print('30d average staking %', df_curve['daily_staking_rate'].head(30).mean())
+    print('\n90d average daily turnover rate', df_curve['daily_turnover_rate'].mean())
+    print('30d average daily turnover rate', df_curve['daily_turnover_rate'].head(30).mean())
 
 
 
@@ -173,17 +259,15 @@ if __name__ == '__main__':
     df['days_invest'] = (pd.to_datetime(df.index, format='%Y%m%d') - pd.to_datetime(date_begin_str, format='%Y%m%d')  ).days
 
     lp_token_price_initial  = df.loc[date_begin_str, 'lp_token_price']
+    lp_token_price_30dayback  = df.loc[selected_dates[-2], 'lp_token_price']
     lp_token_price_final  = df.loc[date_end_str, 'lp_token_price']
     df['lp_token_price_initial'] = lp_token_price_initial
     df['lp_token_price_final'] = lp_token_price_final
+    
+    print("\n Curve pool (staking+fee) yield: ")
+    print("90d (staking+fee) yield ", (lp_token_price_final/lp_token_price_initial-1)*365/90 )
+    print("30d (staking+fee) yield ", (lp_token_price_final/lp_token_price_30dayback-1)*365/30 )
 
-    df['period_lp_yield'] = df['lp_token_price'] / df['lp_token_price_initial'] -1
-    df['annual_lp_yield'] = df['period_lp_yield']* 365/df['days_invest']
-
-    # Select rows where the 'Date' is in the specified list
-    selected_rows = df[df.index.isin(selected_dates)][['lp_token_price', 'days_invest', 'period_lp_yield', 'annual_lp_yield']]
-    selected_rows.to_clipboard()
-    print(selected_rows)
 
 
 

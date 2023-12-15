@@ -15,7 +15,5 @@ def main():
     print(w3.eth.block_number)
 
 
-
-
 if __name__ == '__main__':
     main()

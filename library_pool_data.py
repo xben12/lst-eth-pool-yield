@@ -198,7 +198,7 @@ def get_df_asset_transfer_from_alchemy_result(alchemy_result, col_name_prefix = 
     return df
 
 
-def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_begin_str, b_direction_to = True, alchemy = None):
+def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_begin_str, b_direction_to = True, alchemy = None, tx_category = ["erc20"]):
 
     if(alchemy is None):
         w3, alchemy_api_key = get_web3_provider()
@@ -218,7 +218,7 @@ def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_beg
         cur_block_end = min(block_end, block_now+get_eth_blocks_per_day() )
         if(b_direction_to):
             result_data = alchemy.core.get_asset_transfers(
-                category = [ "erc20"],
+                category = tx_category, # [ "erc20"],
                 from_block = block_now,
                 to_block= cur_block_end, #"latest"
                 to_address= contract_addr
@@ -226,7 +226,7 @@ def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_beg
             direct_prefix = 'in_leg_'
         else: 
             result_data = alchemy.core.get_asset_transfers(
-            category = [ "erc20"], # "external", "internal",
+            category = tx_category, # [ "erc20"], # "external", "internal",
             from_block = block_now,
             to_block= cur_block_end, #"latest"
             from_address=contract_addr
@@ -238,7 +238,13 @@ def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_beg
         block_now = cur_block_end+1
     
     df = pd.concat(df_list)
-    file_csv = "output/token_txs_" + direct_prefix + "_" + contract_addr + ".csv"
+    if(len(tx_category) ==1 and tx_category[0] == "erc20" ):
+        file_csv = "output/token_txs_" + direct_prefix + "_" + contract_addr + ".csv"
+    else:
+        # tx_category = ["external", "internal"]
+        name_addon = "_".join(tx_category)
+        file_csv = "output/token_txs_" +name_addon + direct_prefix + "_" + contract_addr + ".csv"
+
     df.to_csv(file_csv)
     return df
 
