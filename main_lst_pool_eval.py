@@ -5,7 +5,7 @@ import library_pool_data as lib_data
 import library_pool_logic as lib_logic
 
 
-print('\n-- Get MAV SWETH/ETH Pool Data (only top 5 & bottom 5 row)---')
+print('\n-- Get MAV SWETH/ETH Pool Result---')
 date_begin_str='20230909'
 date_end_str = '20231208'
 df_mav = lib_logic.get_mav_pool_daily_asset_hold_and_trade_vol(date_begin_str, date_end_str)
@@ -19,7 +19,7 @@ print('30d average staking %', df_mav['daily_staking_rate'].head(30).mean())
 print('\n90d average daily turnover rate', df_mav['daily_turnover_rate'].mean())
 print('30d average daily turnover rate', df_mav['daily_turnover_rate'].head(30).mean())
 
-print('\n-- Get CURVE STETH/ETH Pool Data ---')
+print('\n-- Get CURVE STETH/ETH Pool Result---')
 df_curve = lib_logic.get_curve_pool_daily_asset_hold_and_trade_vol(date_begin_str, date_end_str)
 print(df_curve.head(2))
 print(df_curve.tail(2))
@@ -32,59 +32,40 @@ print('\n90d average daily turnover rate', df_curve['daily_turnover_rate'].mean(
 print('30d average daily turnover rate', df_curve['daily_turnover_rate'].head(30).mean())
 
 
-
+print('\n-- Get CURVE STETH/ETH Pool LP token yield (fee+staking)---')
 df = lib_data.get_curve_steth_pool_daily_data()
-# 
 df['lp_token_price'] = (df['eth_balance'] + df['token_balance']*df['close_price'])/df['token_totalsupply']
 df.set_index("date_yyyymmdd", inplace=True)
 
-
-selected_dates = ['20230909', '20231008', '20231108', '20231208']
-date_begin_str = selected_dates[0]
-date_end_str = selected_dates[-1]
-
-df['start_date'] = date_begin_str
-df['end_data'] = date_end_str
-df['days_invest'] = (pd.to_datetime(df.index, format='%Y%m%d') - pd.to_datetime(date_begin_str, format='%Y%m%d')  ).days
-
 lp_token_price_initial  = df.loc[date_begin_str, 'lp_token_price']
-lp_token_price_30dayback  = df.loc[selected_dates[-2], 'lp_token_price']
+lp_token_price_30dayback  = df.loc['20231108', 'lp_token_price']
 lp_token_price_final  = df.loc[date_end_str, 'lp_token_price']
-df['lp_token_price_initial'] = lp_token_price_initial
-df['lp_token_price_final'] = lp_token_price_final
-
-print("\n Curve pool (staking+fee) yield: ")
 print("90d (staking+fee) yield ", (lp_token_price_final/lp_token_price_initial-1)*365/90 )
 print("30d (staking+fee) yield ", (lp_token_price_final/lp_token_price_30dayback-1)*365/30 )
 
-
-
-
 print("draw imp loss chart:")
-# product the impermanent loss section picture
 
 price_change_down_scen = np.arange( 0, -0.015, -0.0005)
+LP_bin_range_down  = np.array([-0.01, -0.005, -0.003, -0.002]) # np.arange(-0.01, -0.003, 0.002) 
+
+# get opposite price chg scenarios
 price_change_up_scen = lib_logic.get_bin_price_range_same_liquidity(price_change_down_scen)
 price_change_scen =  np.concatenate((np.flip(price_change_down_scen),price_change_up_scen )) 
 
-# print("price change scenarios: ", price_change_scen)
 
-price_range_down  = np.array([-0.01, -0.005, -0.003, -0.002]) # np.arange(-0.01, -0.003, 0.002) 
 
-result_no_range = lib_logic.get_impermanent_loss(price_change_scen)
-result_array = np.column_stack((price_change_scen, result_no_range[:,0]))
-# print("result no range: ", result_array)
+LP_full_range_no_bin = lib_logic.get_impermanent_loss(price_change_scen)
+result_array = np.column_stack((price_change_scen, LP_full_range_no_bin[:,0]))
 
 imp_loss_column_names = np.array(['Price Change', 'Full range LP'])
 
-#print("price_range_down", price_range_down)
 
-for price_range_down_i in price_range_down:
-    loss_i = lib_logic.get_impermanent_loss_range_pos(price_change_scen, price_range_down_i)
+for LP_bin_range_down_i in LP_bin_range_down:
+    loss_i = lib_logic.get_impermanent_loss_range_pos(price_change_scen, LP_bin_range_down_i)
     # print("shape",result_array.shape, loss_i.shape )
     result_array = np.column_stack((result_array,loss_i ))
-    price_range_up_i = lib_logic.get_bin_price_range_same_liquidity(price_range_down_i)
-    scen_label = "Bin Range [" + '{:.3f}'.format(price_range_down_i) + ","  + '{:.3f}'.format(price_range_up_i) + "]"
+    price_range_up_i = lib_logic.get_bin_price_range_same_liquidity(LP_bin_range_down_i)
+    scen_label = "Bin Range [" + '{:.3f}'.format(LP_bin_range_down_i) + ","  + '{:.3f}'.format(price_range_up_i) + "]"
     imp_loss_column_names = np.append(imp_loss_column_names, scen_label) 
 
 #print("all imp loss:",result_array.shape )

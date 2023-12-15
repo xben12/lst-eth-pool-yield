@@ -1,7 +1,7 @@
-import datetime
-import library_pool_data as lib_data
 import pandas as pd
 import numpy as np
+import datetime
+import library_pool_data as lib_data
 
 
 
@@ -83,6 +83,14 @@ def get_mav_pool_daily_TVL(date_begin_str='20230801', date_end_str = '20231211')
 
 
 def get_curve_pool_daily_asset_hold_and_trade_vol(date_begin_str='20230909', date_end_str = '20231208'):
+
+    #contract_addr = CONST.CURVE_POOL_STETH_ETH
+
+    # the code will directly load data from CSV files
+    # df_to_eth_leg = lib_data.get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_begin_str, b_direction_to = True, tx_category = ["external", "internal"])
+    # df_frm_eth_leg = lib_data.get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_begin_str, b_direction_to = False, tx_category = ["external", "internal"])
+
+
     # df_to = pd.read_csv('output/token_txs_in_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv', index_col=0)
     # df_frm = pd.read_csv('output/token_txs_out_leg__0xDC24316b9AE028F1497c275EB9192a3Ea0f67022.csv',index_col=0)
 

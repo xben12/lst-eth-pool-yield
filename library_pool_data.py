@@ -7,6 +7,7 @@ import time
 import pandas as pd
 import numpy as np
 import requests
+import math
 
 
 import library_constant as CONST 
@@ -28,7 +29,7 @@ def get_block_number_from_date(date_yyyymmdd):
 
     return base_block+time_difference.days*get_eth_blocks_per_day()
 
-import math
+
 
 def get_date_from_block_number(block_number):
     base_block = 18759246 # at date 20231211
@@ -40,8 +41,7 @@ def get_date_from_block_number(block_number):
     return new_datetime.strftime("%Y%m%d")
 
 def get_eth_blocks_per_day():
-    return 7140
-
+    return CONST.NUM_BLOCK_IN_A_DAY
 
 def get_date_and_blocknumber(start_date_str= "20230812", end_date_str= "20231211"):
 
@@ -209,7 +209,7 @@ def get_contract_token_transfer_by_alchemy(contract_addr, date_end_str, date_beg
     block_end = get_block_number_from_date(date_end_str)
 
     direct_prefix = ""
-    block_now = block_begin
+    block_now = block_begin-get_eth_blocks_per_day() # get 1 more day offset for safety
 
     df_list =list()
 
